@@ -1,4 +1,4 @@
-﻿using Certify.Domain;
+using Certify.Domain;
 using Certify.Lib;
 using CommandLine;
 using System;
@@ -40,6 +40,13 @@ namespace Certify.Commands
 
             [Option("skip-web-checks", HelpText = "Skip web service checks")]
             public bool SkipWebServiceChecks { get; set; }
+            
+            [Option('u', "username", HelpText = "Username for LDAP bind (format: user@domain.fqdn). Omit to bind as the current user.")]
+            public string Username { get; set; }
+
+            [Option('p', "password", HelpText = "Password for LDAP bind. If omitted while --username is set, you'll be prompted (input hidden).")]
+            public string Password { get; set; }
+            
         }
 
         public static int Execute(Options opts)
@@ -58,7 +65,7 @@ namespace Certify.Commands
                 return 1;
             }
 
-            var ldap = new LdapOperations(opts.Domain, opts.LdapServer);
+            var ldap = new LdapOperations(opts.Domain, opts.LdapServer, opts.Username, opts.Password);
 
             Console.WriteLine($"[*] Using the search base '{ldap.ConfigurationPath}'");
 
