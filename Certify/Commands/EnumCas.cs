@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.DirectoryServices.AccountManagement;
 using System.Linq;
+using System.Security;
 using System.Security.Principal;
 
 namespace Certify.Commands
@@ -63,6 +64,11 @@ namespace Certify.Commands
             {
                 Console.WriteLine("[X] The 'domain' parameter is not a fully qualified domain name.");
                 return 1;
+            }
+
+            if (!string.IsNullOrEmpty(opts.Username) && string.IsNullOrEmpty(opts.Password))
+            {
+                opts.Password = ReadPasswordMasked($"Password for {opts.Username}: ");
             }
 
             var ldap = new LdapOperations(opts.Domain, opts.LdapServer, opts.Username, opts.Password);
@@ -196,6 +202,46 @@ namespace Certify.Commands
                     else
                         Console.WriteLine("        " + string.Join("\n        ", ca.Templates));
                 }
+            }
+        }
+
+        private static string ReadPasswordMasked(string prompt)
+        {
+            Console.Write(prompt);
+
+            var secure = new SecureString();
+
+            ConsoleKeyInfo key;
+            while ((key = Console.ReadKey(intercept: true)).Key != ConsoleKey.Enter)
+            {
+                if (key.Key == ConsoleKey.Backspace)
+                {
+                    if (secure.Length > 0)
+                    {
+                        secure.RemoveAt(secure.Length - 1);
+                        Console.Write("\b \b");
+                    }
+                    continue;
+                }
+
+                if (key.KeyChar != '\0')
+                {
+                    secure.AppendChar(key.KeyChar);
+                    Console.Write('*');
+                }
+            }
+
+            Console.WriteLine();
+            secure.MakeReadOnly();
+
+            var ptr = System.Runtime.InteropServices.Marshal.SecureStringToGlobalAllocUnicode(secure);
+            try
+            {
+                return System.Runtime.InteropServices.Marshal.PtrToStringUni(ptr);
+            }
+            finally
+            {
+                System.Runtime.InteropServices.Marshal.ZeroFreeGlobalAllocUnicode(ptr);
             }
         }
 
