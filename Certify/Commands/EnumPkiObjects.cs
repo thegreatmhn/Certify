@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.DirectoryServices;
 using System.Linq;
+using System.Security;
 using System.Security.Principal;
 
 namespace Certify.Commands
@@ -43,6 +44,11 @@ namespace Certify.Commands
                 return 1;
             }
 
+            if (!string.IsNullOrEmpty(opts.Username) && string.IsNullOrEmpty(opts.Password))
+            {
+                opts.Password = ReadPasswordMasked($"Password for {opts.Username}: ");
+            }
+
             var ldap = new LdapOperations(opts.Domain, opts.LdapServer, opts.Username, opts.Password);
 
             Console.WriteLine($"[*] Using the search base '{ldap.ConfigurationPath}'");
@@ -78,6 +84,46 @@ namespace Certify.Commands
             return 0;
         }
         
+        private static string ReadPasswordMasked(string prompt)
+        {
+            Console.Write(prompt);
+
+            var secure = new SecureString();
+
+            ConsoleKeyInfo key;
+            while ((key = Console.ReadKey(intercept: true)).Key != ConsoleKey.Enter)
+            {
+                if (key.Key == ConsoleKey.Backspace)
+                {
+                    if (secure.Length > 0)
+                    {
+                        secure.RemoveAt(secure.Length - 1);
+                        Console.Write("\b \b");
+                    }
+                    continue;
+                }
+
+                if (key.KeyChar != '\0')
+                {
+                    secure.AppendChar(key.KeyChar);
+                    Console.Write('*');
+                }
+            }
+
+            Console.WriteLine();
+            secure.MakeReadOnly();
+
+            var ptr = System.Runtime.InteropServices.Marshal.SecureStringToGlobalAllocUnicode(secure);
+            try
+            {
+                return System.Runtime.InteropServices.Marshal.PtrToStringUni(ptr);
+            }
+            finally
+            {
+                System.Runtime.InteropServices.Marshal.ZeroFreeGlobalAllocUnicode(ptr);
+            }
+        }
+
         private static Dictionary<string, List<Tuple<string, string>>> GetPkiObjectControllers(IEnumerable<PKIObject> pki_objects)
         {
             var object_controllers = new Dictionary<string, List<Tuple<string, string>>>();
